@@ -623,20 +623,30 @@ function checkSession(){
 
 function loadFamilyData(cb){
   showSync('loading','⏳ Loading family data...');
+  // Load tasks first to get IDs, then load task_kids with actual IDs
   Promise.all([
     sbGet('kids','family_id=eq.'+family.id+'&order=sort_order'),
     sbGet('tasks','family_id=eq.'+family.id+'&order=sort_order'),
-    sbGet('task_kids','task_id=in.(select%20id%20from%20tasks%20where%20family_id%3Deq.'+family.id+')'),
     sbGet('daily_log','family_id=eq.'+family.id+'&order=date'),
     sbGet('extra_credits','family_id=eq.'+family.id+'&order=date'),
     sbGet('prizes','family_id=eq.'+family.id)
   ]).then(function(results){
     kids=results[0]||[];
     var rawTasks=results[1]||[];
-    var taskKids=results[2]||[];
-    var dailyRows=results[3]||[];
-    var extraRows=results[4]||[];
-    prizes=results[5]||[];
+    var dailyRows=results[2]||[];
+    var extraRows=results[3]||[];
+    prizes=results[4]||[];
+    // Now load task_kids using actual task IDs
+    var taskIds=rawTasks.map(function(t){return t.id;});
+    return Promise.all([
+      taskIds.length?sbGet('task_kids','task_id=in.('+taskIds.join(',')+')'):Promise.resolve([]),
+      Promise.resolve({rawTasks:rawTasks,dailyRows:dailyRows,extraRows:extraRows})
+    ]);
+  }).then(function(r){
+    var taskKids=r[0]||[];
+    var rawTasks=r[1].rawTasks;
+    var dailyRows=r[1].dailyRows;
+    var extraRows=r[1].extraRows;
     tasks=rawTasks.map(function(t){
       t.kidIds=taskKids.filter(function(tk){return tk.task_id===t.id;}).map(function(tk){return tk.kid_id;});
       return t;

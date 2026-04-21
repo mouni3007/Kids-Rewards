@@ -76,14 +76,8 @@ input:focus,select:focus{outline:none;border-color:var(--purple)}
 .auth-tab.active{background:#fff;color:var(--text);box-shadow:0 2px 8px rgba(0,0,0,0.1)}
 
 /* ── PIN KEYPAD ── */
-.pin-display{display:flex;gap:12px;justify-content:center;margin:16px 0}
-.pin-dot{width:18px;height:18px;border-radius:50%;border:3px solid var(--border);transition:all 0.2s}
-.pin-dot.filled{background:var(--purple);border-color:var(--purple);transform:scale(1.1)}
-.pin-keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:240px;margin:0 auto}
-.pin-key{height:56px;border:none;border-radius:16px;background:var(--bg);font-family:'Fredoka One',sans-serif;font-size:22px;cursor:pointer;transition:all 0.1s;color:var(--text);border:2px solid var(--border)}
-.pin-key:active{transform:scale(0.92);background:var(--purple-light)}
-.pin-key.del{font-size:16px;font-family:'Nunito',sans-serif;font-weight:800}
-.pin-key.empty{visibility:hidden}
+
+
 
 /* ── HOME ── */
 .home-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
@@ -228,12 +222,8 @@ input:focus,select:focus{outline:none;border-color:var(--purple)}
       <div id="auth-login">
         <div class="form-row"><label>Email</label><input type="email" id="login-email" placeholder="your@email.com"></div>
         <div class="form-row">
-          <label>Your PIN</label>
-          <div class="pin-display" id="login-pin-display">
-            <div class="pin-dot" id="ldot0"></div><div class="pin-dot" id="ldot1"></div>
-            <div class="pin-dot" id="ldot2"></div><div class="pin-dot" id="ldot3"></div>
-          </div>
-          <div class="pin-keypad" id="login-keypad"></div>
+          <label>Your PIN (4 digits)</label>
+          <input type="password" id="login-pin" placeholder="••••" maxlength="4" style="letter-spacing:8px;font-size:22px;text-align:center" inputmode="numeric" pattern="[0-9]*">
         </div>
         <div id="login-err" style="color:var(--red-dark);font-size:13px;font-weight:700;margin-bottom:10px;display:none;text-align:center"></div>
         <button class="btn btn-purple btn-full" style="margin-top:8px" onclick="doLogin()">Log in ✨</button>
@@ -242,12 +232,9 @@ input:focus,select:focus{outline:none;border-color:var(--purple)}
         <div class="form-row"><label>Family name</label><input type="text" id="signup-family" placeholder="e.g. The Smiths"></div>
         <div class="form-row"><label>Email</label><input type="email" id="signup-email" placeholder="your@email.com"></div>
         <div class="form-row">
-          <label>Choose a PIN</label>
-          <div class="pin-display" id="signup-pin-display">
-            <div class="pin-dot" id="sdot0"></div><div class="pin-dot" id="sdot1"></div>
-            <div class="pin-dot" id="sdot2"></div><div class="pin-dot" id="sdot3"></div>
-          </div>
-          <div class="pin-keypad" id="signup-keypad"></div>
+          <label>Choose a PIN (4 digits)</label>
+          <input type="password" id="signup-pin" placeholder="••••" maxlength="4" style="letter-spacing:8px;font-size:22px;text-align:center" inputmode="numeric" pattern="[0-9]*">
+          <div style="font-size:12px;font-weight:600;color:var(--muted);margin-top:6px">This PIN protects your Parent Settings</div>
         </div>
         <div id="signup-err" style="color:var(--red-dark);font-size:13px;font-weight:700;margin-bottom:10px;display:none;text-align:center"></div>
         <button class="btn btn-green btn-full" style="margin-top:8px" onclick="doSignup()">Create account 🚀</button>
@@ -448,13 +435,11 @@ input:focus,select:focus{outline:none;border-color:var(--purple)}
     </div>
     <div class="card">
       <div class="sec-title">Change PIN</div>
-      <div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:12px">Enter a new 4-digit PIN.</div>
-      <div class="pin-display" id="change-pin-display">
-        <div class="pin-dot" id="cdot0"></div><div class="pin-dot" id="cdot1"></div>
-        <div class="pin-dot" id="cdot2"></div><div class="pin-dot" id="cdot3"></div>
+      <div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:12px">Enter a new 4-digit PIN to protect Parent Settings.</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="password" id="change-pin" placeholder="••••" maxlength="4" style="width:120px;letter-spacing:8px;font-size:22px;text-align:center" inputmode="numeric" pattern="[0-9]*">
+        <button class="btn btn-purple btn-sm" onclick="changePin()">Update PIN 🔒</button>
       </div>
-      <div class="pin-keypad" id="change-keypad"></div>
-      <button class="btn btn-purple btn-sm" style="margin-top:12px" onclick="changePin()">Update PIN 🔒</button>
       <div id="pin-change-status" style="font-size:13px;font-weight:700;color:var(--green-dark);margin-top:8px"></div>
     </div>
   </div>
@@ -488,8 +473,6 @@ var calYear=new Date().getFullYear();
 var calMonth=new Date().getMonth();
 var histContext={kidId:null,k:null};
 var appLoaded=false;
-var pinBuffers={login:'',signup:'',change:''};
-
 // ── SUPABASE ──
 function sbFetch(path,method,body){
   return fetch(SB_URL+'/rest/v1/'+path,{
@@ -518,40 +501,7 @@ function showSync(type,msg){
   if(type==='ok') setTimeout(function(){wrap.style.display='none';},2500);
 }
 
-// ── PIN KEYPAD ──
-function buildKeypad(containerId,bufferKey,dotPrefix,maxLen,onComplete){
-  var container=document.getElementById(containerId);if(!container) return;
-  container.innerHTML='';
-  var keys=['1','2','3','4','5','6','7','8','9','','0','del'];
-  keys.forEach(function(k){
-    var btn=document.createElement('button');
-    btn.className='pin-key'+(k===''?' empty':k==='del'?' del':'');
-    btn.textContent=k==='del'?'⌫':k;
-    if(k!==''){
-      btn.onclick=function(){
-        if(k==='del'){
-          if(pinBuffers[bufferKey].length>0){
-            pinBuffers[bufferKey]=pinBuffers[bufferKey].slice(0,-1);
-            updatePinDots(dotPrefix,pinBuffers[bufferKey].length);
-          }
-        } else {
-          if(pinBuffers[bufferKey].length<maxLen){
-            pinBuffers[bufferKey]+=k;
-            updatePinDots(dotPrefix,pinBuffers[bufferKey].length);
-            if(pinBuffers[bufferKey].length===maxLen&&onComplete) onComplete();
-          }
-        }
-      };
-    }
-    container.appendChild(btn);
-  });
-}
-function updatePinDots(prefix,count){
-  for(var i=0;i<4;i++){
-    var dot=document.getElementById(prefix+i);
-    if(dot) dot.className='pin-dot'+(i<count?' filled':'');
-  }
-}
+
 
 // ── AUTH ──
 function authTab(tab){
@@ -564,7 +514,7 @@ function authTab(tab){
 function doSignup(){
   var fName=document.getElementById('signup-family').value.trim();
   var email=document.getElementById('signup-email').value.trim().toLowerCase();
-  var pin=pinBuffers.signup;
+  var pin=document.getElementById('signup-pin').value.trim();
   var errEl=document.getElementById('signup-err');errEl.style.display='none';
   if(!fName){errEl.textContent='Please enter your family name.';errEl.style.display='block';return;}
   if(!email||!email.includes('@')){errEl.textContent='Please enter a valid email.';errEl.style.display='block';return;}
@@ -583,7 +533,7 @@ function doSignup(){
 
 function doLogin(){
   var email=document.getElementById('login-email').value.trim().toLowerCase();
-  var pin=pinBuffers.login;
+  var pin=document.getElementById('login-pin').value.trim();
   var errEl=document.getElementById('login-err');errEl.style.display='none';
   if(!email){errEl.textContent='Please enter your email.';errEl.style.display='block';return;}
   if(pin.length!==4){errEl.textContent='Please enter your 4-digit PIN.';errEl.style.display='block';return;}
@@ -591,7 +541,7 @@ function doLogin(){
   sbGet('families','email=eq.'+encodeURIComponent(email)).then(function(rows){
     if(!rows||!rows.length){showSync('err','');errEl.textContent='No account found with this email.';errEl.style.display='block';return;}
     var f=rows[0];
-    if(f.pin!==pin){showSync('err','');errEl.textContent='Wrong PIN. Try again.';errEl.style.display='block';pinBuffers.login='';updatePinDots('ldot',0);return;}
+    if(f.pin!==pin){showSync('err','');errEl.textContent='Wrong PIN. Try again.';errEl.style.display='block';document.getElementById('login-pin').value='';return;}
     family=f;saveSession();
     showSync('ok','✅ Welcome back!');
     loadFamilyData(function(){goTo('s-home');renderHome();});
@@ -601,8 +551,6 @@ function doLogin(){
 function doLogout(){
   family=null;kids=[];tasks=[];dailyLog={};extraCredits={};prizes=[];appLoaded=false;
   localStorage.removeItem('kr_session');
-  pinBuffers={login:'',signup:'',change:''};
-  updatePinDots('ldot',0);
   goTo('s-auth');authTab('login');
 }
 
@@ -704,7 +652,15 @@ function goTo(id){
 function getViewDate(){return viewingDate||today();}
 function getViewKey(){return fmtDate(getViewDate());}
 function isViewingToday(){return getViewKey()===todayStr();}
-function openParent(){if(!appLoaded){alert('Still loading, please wait.');return;}goTo('s-parent');pTab('tasks');}
+function openParent(){
+  if(!appLoaded){alert('Still loading, please wait.');return;}
+  var pin=family?family.pin||'':'';
+  if(!pin){goTo('s-parent');pTab('tasks');return;}
+  var entered=prompt('Enter parent PIN:');
+  if(entered===null) return;
+  if(entered.trim()===pin.trim()){goTo('s-parent');pTab('tasks');}
+  else alert('Wrong PIN. Try again.');
+}
 
 // ── HOME ──
 function renderHome(){
@@ -1347,20 +1303,17 @@ function saveFamilyName(){
 }
 
 function changePin(){
-  var pin=pinBuffers.change;
-  if(pin.length!==4){document.getElementById('pin-change-status').textContent='Please enter a 4-digit PIN.';return;}
+  var pin=document.getElementById('change-pin').value.trim();
+  if(pin.length!==4||isNaN(pin)){document.getElementById('pin-change-status').textContent='Please enter a 4-digit number.';return;}
   sbPatch('families','id=eq.'+family.id,{pin:pin}).then(function(){
-    family.pin=pin;pinBuffers.change='';updatePinDots('cdot',0);
+    family.pin=pin;
+    document.getElementById('change-pin').value='';
     document.getElementById('pin-change-status').textContent='PIN updated ✅';
     setTimeout(function(){document.getElementById('pin-change-status').textContent='';},3000);
   }).catch(function(e){showSync('err','⚠️ '+e.message);});
 }
 
 // ── INIT ──
-buildKeypad('login-keypad','login','ldot',4,null);
-buildKeypad('signup-keypad','signup','sdot',4,null);
-buildKeypad('change-keypad','change','cdot',4,null);
-
 if(!checkSession()){goTo('s-auth');authTab('login');}
 </script>
 </body>
